@@ -187,6 +187,10 @@ footer a{color:var(--accent);text-decoration:none}
 </div>
 
 <main>
+  <div style="display:flex;align-items:center;gap:10px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:11px 16px;margin-bottom:18px;font-size:.78rem;color:#c7d2fe;line-height:1.6">
+    <span style="font-size:1.1rem;flex-shrink:0">ℹ️</span>
+    <span><strong>Disclaimer:</strong> All tokens held by Covenant Foundation wallets — including the Easy A Kickstarter Treasury, Main Covenant lock, Meteora Liquidity Pool, and Founders' allocation — were acquired exclusively through open-market purchases. No tokens were pre-minted, team-allocated, or received at preferential prices.</span>
+  </div>
   <div class="notice warn" id="shieldsNote">
     ⚠ <strong>Brave Shields may be blocking price data.</strong> Click the lion icon → disable Shields for this page → refresh. Blockchain data will still load regardless.
   </div>
@@ -300,7 +304,7 @@ const KNOWN = {
            link:SF_URL, contractAddr:SF_CONTRACT }
   },
   '2SMBrCJAYKnpLBgnJBvizgFu98nZPTpZCsVNzR6LVrBm': {
-    label:'Easy A Wallets', locked:false, pending:true,
+    label:'Easy A Kickstarter Treasury (market bought)', locked:false, pending:true,
     expectedAmt:128925033, expectedPct:12.89,
     lock:{ platform:'Pending Lock', platClass:'p-pend', duration:'TBD',
            start:'TBD', detail:'Will be locked upon tokenomics announcement',
@@ -321,10 +325,10 @@ const KNOWN = {
            link:null, contractAddr:null }
   },
   '7mdeS3BkFNpd82nYpAM9x48DT5PB6LRoqnBJk6FGR5M6': {
-    label:'Foundation', locked:true, pending:false,
+    label:'Covenant Foundation', locked:true, pending:false,
     expectedAmt:8040230, expectedPct:0.804,
     lock:{ platform:'Unknown', platClass:'p-unk', duration:'TBD',
-           start:'TBD', detail:'Foundation reserve allocation',
+           start:'TBD', detail:'Covenant Foundation reserve allocation',
            link:null, contractAddr:null }
   },
 };
@@ -617,9 +621,9 @@ function renderDonut(){
     {label:'Locked — Covenant',     amt:300000000, color:'#f59e0b', tier:'locked'},
     {label:'Locked — Meteora Pool', amt:56695437,  color:'#06b6d4', tier:'locked'},
     {label:'Locked — Founders',     amt:38592440,  color:'#f97316', tier:'locked'},
-    {label:'Locked — Foundation',   amt:8040230,   color:'#a78bfa', tier:'locked'},
+    {label:'Locked — Covenant Foundation', amt:8040230, color:'#a78bfa', tier:'locked'},
     // pending — rendered striped
-    {label:'Pending Lock (Easy A)', amt:PENDING_AMT, color:'url(#pending-stripe)', solidColor:'#6366f1', tier:'pending'},
+    {label:'Pending Lock (Easy A Kickstarter Treasury)', amt:PENDING_AMT, color:'url(#pending-stripe)', solidColor:'#6366f1', tier:'pending'},
   ].map(x=>({...x,pct:(x.amt/supply)*100}));
 
   const total=items.reduce((s,x)=>s+x.pct,0);
@@ -716,8 +720,8 @@ function renderBars(){
     {n:'Locked — Covenant',a:300000000,c:'#f59e0b'},
     {n:'Locked — Meteora Pool',a:56695437,c:'#06b6d4'},
     {n:'Locked — Founders',a:38592440,c:'#f97316'},
-    {n:'Locked — Foundation',a:8040230,c:'#a78bfa'},
-    {n:'Pending Lock (Easy A)',a:128925033,c:'#6366f1'},
+    {n:'Locked — Covenant Foundation',a:8040230,c:'#a78bfa'},
+    {n:'Pending Lock (Easy A Kickstarter Treasury)',a:128925033,c:'#6366f1'},
   ];
   const el=document.getElementById('supplyBars');el.innerHTML='';
   cats.forEach(c=>{
