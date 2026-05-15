@@ -189,7 +189,7 @@ footer a{color:var(--accent);text-decoration:none}
 <main>
   <div style="display:flex;align-items:center;gap:10px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:11px 16px;margin-bottom:18px;font-size:.78rem;color:#c7d2fe;line-height:1.6">
     <span style="font-size:1.1rem;flex-shrink:0">ℹ️</span>
-    <span><strong>Disclaimer:</strong> All tokens held by Covenant Foundation wallets — including the Easy A Kickstarter Treasury, Main Covenant lock, Meteora Liquidity Pool, and Founders' allocation — were acquired exclusively through open-market purchases. No tokens were pre-minted, team-allocated, or received at preferential prices.</span>
+    <span><strong>Disclaimer:</strong> All tokens held by Covenant Foundation wallets — including the Easy A Kickstarter Treasury, Covenant Foundation lock, Meteora Liquidity Pool, and Founders' allocation — were acquired exclusively through open-market purchases. No tokens were pre-minted, team-allocated, or received at preferential prices.</span>
   </div>
   <div class="notice warn" id="shieldsNote">
     ⚠ <strong>Brave Shields may be blocking price data.</strong> Click the lion icon → disable Shields for this page → refresh. Blockchain data will still load regardless.
@@ -297,7 +297,7 @@ const RPCS = [
 // ═══════════════════════════════════════════
 const KNOWN = {
   'Ep6DQRtFcot3HaG5osN4gW3nmrtXCtUG6yVnKyF48pYp': {
-    label:'Main Covenant', locked:true, pending:false,
+    label:'Covenant Foundation', locked:true, pending:false,
     expectedAmt:300000000, expectedPct:30,
     lock:{ platform:'Streamflow', platClass:'p-sf', duration:'12 months',
            start:'From token launch', detail:'Community, team & market making allocation',
@@ -618,7 +618,7 @@ function renderDonut(){
   const items=[
     {label:'Circulating (unlocked)', amt:supply-locked-PENDING_AMT, color:'#0f172a', opacity:0.9, tier:'circ'},
     // locked segments — rendered bright
-    {label:'Locked — Covenant',     amt:300000000, color:'#f59e0b', tier:'locked'},
+    {label:'Locked — Covenant Foundation (30%)', amt:300000000, color:'#f59e0b', tier:'locked'},
     {label:'Locked — Meteora Pool', amt:56695437,  color:'#06b6d4', tier:'locked'},
     {label:'Locked — Founders',     amt:38592440,  color:'#f97316', tier:'locked'},
     {label:'Locked — Covenant Foundation', amt:8040230, color:'#a78bfa', tier:'locked'},
@@ -717,7 +717,7 @@ function renderBars(){
   const locked=Object.values(KNOWN).filter(w=>w.locked).reduce((s,w)=>s+w.expectedAmt,0);
   const cats=[
     {n:'Circulating (unlocked)',a:supply-locked,c:'#10b981'},
-    {n:'Locked — Covenant',a:300000000,c:'#f59e0b'},
+    {n:'Locked — Covenant Foundation (30%)',a:300000000,c:'#f59e0b'},
     {n:'Locked — Meteora Pool',a:56695437,c:'#06b6d4'},
     {n:'Locked — Founders',a:38592440,c:'#f97316'},
     {n:'Locked — Covenant Foundation',a:8040230,c:'#a78bfa'},
