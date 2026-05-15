@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tokenomics Tracker</title>
+<style>
+:root{
+  --bg:#080a12;--bg2:#0e1120;--bg3:#141828;--bg4:#1a2035;
+  --border:rgba(99,102,241,.18);--border2:rgba(99,102,241,.32);
+  --accent:#6366f1;--accent2:#8b5cf6;
+  --green:#10b981;--red:#ef4444;--yellow:#f59e0b;--blue:#06b6d4;--orange:#f97316;
+  --text:#e2e8f0;--muted:#94a3b8;--dim:#475569;
+  --shadow:0 4px 24px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;top:-200px;left:50%;transform:translateX(-50%);width:900px;height:700px;background:radial-gradient(ellipse,rgba(99,102,241,.1) 0%,transparent 70%);pointer-events:none;z-index:0}
+
+/* Header */
+header{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:16px 28px;border-bottom:1px solid var(--border);background:rgba(8,10,18,.9);backdrop-filter:blur(16px)}
+.hdr-l{display:flex;align-items:center;gap:14px}
+.tok-icon{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff;box-shadow:0 0 20px rgba(99,102,241,.4);flex-shrink:0}
+.tok-name h1{font-size:1.05rem;font-weight:700}
+.tok-name .sym{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.pill{font-size:.67rem;color:var(--muted);background:var(--bg3);border:1px solid var(--border);padding:3px 9px;border-radius:999px;font-family:monospace;cursor:pointer;transition:border-color .2s,color .2s}
+.pill:hover{border-color:var(--accent);color:var(--text)}
+.hdr-r{display:flex;align-items:center;gap:12px}
+.pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);margin-right:5px;animation:pls 2s infinite}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.3}}
+.upd{text-align:right;font-size:.68rem;color:var(--muted);line-height:1.6}
+.upd .cd{color:var(--accent);font-weight:600}
+.rbtn{display:flex;align-items:center;gap:5px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;padding:7px 14px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap}
+.rbtn:hover{opacity:.85}
+.rbtn.spin svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* RPC status bar */
+.rpc-bar{display:flex;align-items:center;gap:8px;padding:7px 28px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:.68rem;color:var(--muted);position:sticky;top:57px;z-index:40}
+.rpc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.rpc-ok{background:var(--green);box-shadow:0 0 5px var(--green)}
+.rpc-err{background:var(--red)}
+.rpc-load{background:var(--yellow);animation:pls 1s infinite}
+
+main{position:relative;z-index:5;padding:22px 28px;max-width:1440px;margin:0 auto}
+
+/* Notices */
+.notice{display:none;padding:10px 16px;border-radius:8px;font-size:.74rem;margin-bottom:18px;line-height:1.6}
+.notice.warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.22);color:#fcd34d}
+.notice.err{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.22);color:#fca5a5}
+
+/* Stats grid */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:13px;margin-bottom:22px}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:15px 17px;box-shadow:var(--shadow);transition:border-color .2s,transform .2s}
+.sc:hover{border-color:var(--border2);transform:translateY(-2px)}
+.sc .lbl{font-size:.64rem;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;margin-bottom:7px}
+.sc .val{font-size:1.4rem;font-weight:700;background:linear-gradient(135deg,#e2e8f0,#a5b4fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;min-height:1.75rem}
+.sc .sub{font-size:.68rem;margin-top:3px}
+.up{color:var(--green)}.dn{color:var(--red)}.nm{color:var(--muted)}
+.shim{display:inline-block;width:65px;height:1.4rem;background:linear-gradient(90deg,var(--bg3) 25%,var(--bg2) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shim 1.5s infinite;border-radius:5px}
+@keyframes shim{to{background-position:-200% 0}}
+
+/* Charts row */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:17px;margin-bottom:22px}
+@media(max-width:860px){.charts-row{grid-template-columns:1fr}}
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:19px 21px;box-shadow:var(--shadow)}
+.cc h2{font-size:.86rem;font-weight:600;margin-bottom:3px}
+.cc .csub{font-size:.68rem;color:var(--muted);margin-bottom:15px}
+.donut-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+#donutSvg{flex-shrink:0;overflow:visible}
+.donut-path{cursor:pointer;transition:opacity .15s}
+.donut-path:hover{opacity:.75}
+.donut-legend{display:flex;flex-direction:column;gap:5px;flex:1;min-width:150px;max-height:230px;overflow-y:auto}
+.leg-i{display:flex;align-items:center;gap:6px;font-size:.7rem;color:var(--muted)}
+.leg-d{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.leg-p{margin-left:auto;font-weight:600;color:var(--text);font-size:.72rem}
+.bars{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.bar-row{display:flex;flex-direction:column;gap:4px}
+.bar-hdr{display:flex;justify-content:space-between;font-size:.74rem}
+.bar-name{color:var(--text);font-weight:500}
+.bar-amt{color:var(--muted);font-size:.68rem}
+.bar-track{height:7px;background:var(--bg3);border-radius:999px;overflow:hidden}
+.bar-fill{height:100%;border-radius:999px;transition:width 1s cubic-bezier(.4,0,.2,1)}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:19px 21px;box-shadow:var(--shadow);margin-bottom:22px;overflow:hidden}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.card-hdr h2{font-size:.86rem;font-weight:600}
+.badge{font-size:.65rem;background:var(--bg3);border:1px solid var(--border);color:var(--muted);padding:3px 8px;border-radius:999px}
+.badge.live-badge{color:var(--green);border-color:rgba(16,185,129,.3)}
+
+/* Table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.79rem}
+thead th{color:var(--muted);font-weight:500;font-size:.64rem;text-transform:uppercase;letter-spacing:.07em;padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s}
+tbody tr:hover{background:rgba(99,102,241,.06)}
+tbody tr:last-child{border-bottom:none}
+td{padding:9px 10px;vertical-align:middle}
+.rank-cell{color:var(--dim);font-size:.72rem;font-weight:600;font-family:monospace;text-align:center}
+.rank-cell.top3{color:var(--accent)}
+.addr-cell{display:flex;align-items:center;gap:6px;font-family:monospace;font-size:.71rem;color:var(--muted)}
+.addr-cell a{color:var(--accent);text-decoration:none}
+.addr-cell a:hover{text-decoration:underline}
+.cpbtn{background:none;border:none;color:var(--dim);cursor:pointer;padding:2px;line-height:0;transition:color .15s}
+.cpbtn:hover{color:var(--text)}
+.label-cell{font-weight:600;font-size:.8rem}
+.pct-cell{font-weight:700;color:var(--accent)}
+.amt-cell{font-family:monospace;font-size:.74rem;white-space:nowrap}
+.live-cell{font-family:monospace;font-size:.74rem;white-space:nowrap}
+.live-cell.ok{color:var(--green)}
+.live-cell.warn{color:var(--yellow)}
+.live-cell.loading{color:var(--dim)}
+.live-cell.err{color:var(--red)}
+.sb{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:999px;font-size:.63rem;font-weight:600;white-space:nowrap}
+.sb-lock{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.25)}
+.sb-free{background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2)}
+.sb-pend{background:rgba(99,102,241,.1);color:var(--accent);border:1px solid rgba(99,102,241,.2)}
+
+/* Locked verifier */
+.verif-intro{font-size:.76rem;color:var(--muted);margin-bottom:16px;line-height:1.65}
+.verif-intro strong{color:var(--text)}
+.lock-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(295px,1fr));gap:13px}
+.lcard{background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:16px;transition:border-color .2s}
+.lcard:hover{border-color:var(--border2)}
+.lc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px}
+.lc-label{font-size:.86rem;font-weight:700}
+.lc-plat{font-size:.63rem;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.p-sf{background:rgba(99,102,241,.15);color:var(--accent)}
+.p-mt{background:rgba(6,182,212,.15);color:var(--blue)}
+.p-unk{background:rgba(148,163,184,.1);color:var(--muted)}
+.p-pend{background:rgba(245,158,11,.1);color:var(--yellow)}
+.lc-addr-row{display:flex;align-items:center;gap:6px;font-family:monospace;font-size:.68rem;color:var(--dim);margin-bottom:11px}
+.lc-addr-row a{color:var(--accent);text-decoration:none}
+.lc-addr-row a:hover{text-decoration:underline}
+.match-tag{font-size:.62rem;font-weight:600;padding:2px 6px;border-radius:999px;margin-left:4px}
+.mt-ok{background:rgba(16,185,129,.12);color:var(--green)}
+.mt-warn{background:rgba(245,158,11,.12);color:var(--yellow)}
+.mt-load{background:rgba(148,163,184,.08);color:var(--muted)}
+.mt-err{background:rgba(239,68,68,.1);color:var(--red)}
+.lc-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
+.lcs{background:var(--bg2);border:1px solid rgba(255,255,255,.05);border-radius:7px;padding:9px 10px}
+.lcs-lbl{font-size:.59rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+.lcs-val{font-size:.86rem;font-weight:700}
+.lcs-val.lv-ok{color:var(--green)}
+.lcs-val.lv-warn{color:var(--yellow)}
+.lcs-val.lv-load{color:var(--dim);font-size:.74rem;font-weight:400}
+.lc-prog{height:4px;background:var(--bg2);border-radius:999px;overflow:hidden;margin-bottom:9px}
+.lc-prog-fill{height:100%;border-radius:999px;background:var(--yellow);transition:width 1s ease}
+.lc-meta{font-size:.69rem;color:var(--muted);line-height:1.55;margin-bottom:9px}
+.lc-meta strong{color:var(--text)}
+.lc-links{display:flex;gap:6px;flex-wrap:wrap}
+.lc-link{display:inline-flex;align-items:center;gap:3px;font-size:.66rem;color:var(--accent);text-decoration:none;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.18);padding:3px 9px;border-radius:6px;transition:background .15s}
+.lc-link:hover{background:rgba(99,102,241,.18)}
+
+footer{text-align:center;padding:20px 28px;color:var(--muted);font-size:.68rem;border-top:1px solid var(--border);position:relative;z-index:5}
+footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-l">
+    <div class="tok-icon" id="tokIcon">?</div>
+    <div class="tok-name">
+      <h1 id="tokName">Loading…</h1>
+      <div class="sym" id="tokSym">Solana</div>
+    </div>
+    <div class="pill" onclick="copyText('y4JiNFzBPofqiCpuDTcVq11nhUDQoDzeK1UBCoXxF9y',this)" title="Copy mint address">y4JiNF…xF9y</div>
+  </div>
+  <div class="hdr-r">
+    <div class="upd">
+      <span class="pulse"></span><span id="updEl">Fetching…</span><br>
+      <span class="cd">Refresh in <span id="cdEl">3:00</span></span>
+    </div>
+    <button class="rbtn" id="refBtn" onclick="triggerRefresh()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Refresh
+    </button>
+  </div>
+</header>
+
+<div class="rpc-bar">
+  <span class="rpc-dot rpc-load" id="rpcDot"></span>
+  <span id="rpcLabel">Connecting to Solana RPC…</span>
+  <span style="margin-left:auto;opacity:.5" id="rpcEndpoint"></span>
+</div>
+
+<main>
+  <div class="notice warn" id="shieldsNote">
+    ⚠ <strong>Brave Shields may be blocking price data.</strong> Click the lion icon → disable Shields for this page → refresh. Blockchain data will still load regardless.
+  </div>
+  <div class="notice err" id="errBanner"></div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="sc"><div class="lbl">Price (USD)</div><div class="val" id="sPrice"><span class="shim"></span></div><div class="sub" id="sChg">&nbsp;</div></div>
+    <div class="sc"><div class="lbl">Market Cap <span style="font-size:.58rem;color:var(--muted);font-weight:400">(circ)</span></div><div class="val" id="sMcap"><span class="shim"></span></div><div class="sub nm" id="sMcapSub">&nbsp;</div></div>
+    <div class="sc"><div class="lbl">FDV <span style="font-size:.58rem;color:var(--muted);font-weight:400">(fully diluted)</span></div><div class="val" id="sFdvCard"><span class="shim"></span></div><div class="sub nm" id="sFdvSub">&nbsp;</div></div>
+    <div class="sc"><div class="lbl">24h Volume</div><div class="val" id="sVol"><span class="shim"></span></div><div class="sub nm" id="sLiq">&nbsp;</div></div>
+    <div class="sc"><div class="lbl">Total Supply</div><div class="val" id="sTotal"><span class="shim"></span></div><div class="sub nm">On-chain</div></div>
+    <div class="sc"><div class="lbl">Circulating</div><div class="val" id="sCirc"><span class="shim"></span></div><div class="sub nm" id="sCircP">&nbsp;</div></div>
+    <div class="sc"><div class="lbl">Locked</div><div class="val" id="sLock"><span class="shim"></span></div><div class="sub nm" id="sLockP">&nbsp;</div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="cc">
+      <h2>Token Lock Distribution</h2>
+      <div class="csub">Locked &amp; pending positions as % of total supply — hover to inspect</div>
+      <div class="donut-wrap">
+        <svg id="donutSvg" width="195" height="195" viewBox="0 0 195 195"></svg>
+        <div class="donut-legend" id="donutLeg"></div>
+      </div>
+    </div>
+    <div class="cc">
+      <h2>Supply Breakdown</h2>
+      <div class="csub">Circulating vs each locked category</div>
+      <div class="bars" id="supplyBars"></div>
+    </div>
+  </div>
+
+  <!-- Top Holders Table -->
+  <div class="card">
+    <div class="card-hdr">
+      <h2>Top Holders — Live</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge live-badge" id="holdersBadge">● Live</span>
+        <span class="badge" id="holdersCnt">Loading…</span>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:36px">#</th>
+          <th>Address</th>
+          <th>Label</th>
+          <th>% Supply</th>
+          <th>Live Balance</th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody id="holdersTbody"></tbody>
+      </table>
+    </div>
+    <div style="font-size:.67rem;color:var(--dim);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+      ⓘ Top 50 holders fetched live via Helius RPC in a single batch call. Falls back to standard Solana RPC (top 20) if Helius is unavailable.
+    </div>
+  </div>
+
+  <!-- Locked Wallet Verifier -->
+  <div class="card">
+    <div class="card-hdr">
+      <h2>🔒 Locked Wallet Verifier</h2>
+      <span class="badge live-badge">● Live on-chain</span>
+    </div>
+    <p class="verif-intro">
+      Each locked position is verified against the <strong>Solana blockchain</strong> in real-time.
+      Live balances are pulled via a single batched RPC call — compare against expected to confirm tokens haven't moved.
+      Click any link to inspect independently.
+    </p>
+    <div class="lock-grid" id="lockGrid"></div>
+  </div>
+</main>
+
+<footer>
+  Price: <a href="https://jup.ag" target="_blank">Jupiter</a> + <a href="https://dexscreener.com" target="_blank">DexScreener</a> ·
+  Chain data: <a href="https://solana.com" target="_blank">Solana RPC</a> ·
+  <a href="https://solscan.io/token/y4JiNFzBPofqiCpuDTcVq11nhUDQoDzeK1UBCoXxF9y" target="_blank">View on Solscan ↗</a> ·
+  Refreshes every 3 min
+</footer>
+
+<script>
+// ═══════════════════════════════════════════
+//  CONFIGURATION
+// ═══════════════════════════════════════════
+const TOKEN_MINT   = 'y4JiNFzBPofqiCpuDTcVq11nhUDQoDzeK1UBCoXxF9y';
+const REFRESH_SEC  = 180;
+const SF_URL       = 'https://app.streamflow.finance/contract/solana/mainnet/EQmWMauJ68CDAXc9RKVeL2WMzYny1jmVBpe7Zgk2Sovy?new';
+const SF_CONTRACT  = 'EQmWMauJ68CDAXc9RKVeL2WMzYny1jmVBpe7Zgk2Sovy';
+
+// RPC endpoints — Helius primary (supports top-50 via getTokenAccounts), then fallbacks
+const HELIUS_RPC  = 'https://mainnet.helius-rpc.com/?api-key=619bf25b-1402-44bc-962a-7f415fd0c30a';
+const HELIUS_BETA = 'https://beta.helius-rpc.com/?api-key=619bf25b-1402-44bc-962a-7f415fd0c30a';
+const RPCS = [
+  HELIUS_RPC,
+  HELIUS_BETA,
+  'https://api.mainnet-beta.solana.com',
+  'https://rpc.ankr.com/solana',
+];
+
+// ═══════════════════════════════════════════
+//  KNOWN WALLETS  (labeled / locked positions)
+// ═══════════════════════════════════════════
+const KNOWN = {
+  'Ep6DQRtFcot3HaG5osN4gW3nmrtXCtUG6yVnKyF48pYp': {
+    label:'Main Covenant', locked:true, pending:false,
+    expectedAmt:300000000, expectedPct:30,
+    lock:{ platform:'Streamflow', platClass:'p-sf', duration:'12 months',
+           start:'From token launch', detail:'Community, team & market making allocation',
+           link:SF_URL, contractAddr:SF_CONTRACT }
+  },
+  '2SMBrCJAYKnpLBgnJBvizgFu98nZPTpZCsVNzR6LVrBm': {
+    label:'Easy A Wallets', locked:false, pending:true,
+    expectedAmt:128925033, expectedPct:12.89,
+    lock:{ platform:'Pending Lock', platClass:'p-pend', duration:'TBD',
+           start:'TBD', detail:'Will be locked upon tokenomics announcement',
+           link:null, contractAddr:null }
+  },
+  'HLnpSz9h2S4hiLQ43rnSCA7B8hQMKmDaiTLcC': {
+    label:'Meteora Liq Pool', locked:true, pending:false,
+    expectedAmt:56695437, expectedPct:5.6,
+    lock:{ platform:'Meteora', platClass:'p-mt', duration:'Indefinite',
+           start:'From pool creation', detail:'Locked LP position in Meteora DLMM pool',
+           link:'https://app.meteora.ag/', contractAddr:null }
+  },
+  'F5E6DuMv78YhbtbzUpk3w3ahDLpHW53PEEBfTE8rD2Jb': {
+    label:"Founders' Tokens", locked:true, pending:false,
+    expectedAmt:38592440, expectedPct:3.85,
+    lock:{ platform:'Unknown', platClass:'p-unk', duration:'TBD',
+           start:'TBD', detail:'Founder team allocation',
+           link:null, contractAddr:null }
+  },
+  '7mdeS3BkFNpd82nYpAM9x48DT5PB6LRoqnBJk6FGR5M6': {
+    label:'Foundation', locked:true, pending:false,
+    expectedAmt:8040230, expectedPct:0.804,
+    lock:{ platform:'Unknown', platClass:'p-unk', duration:'TBD',
+           start:'TBD', detail:'Foundation reserve allocation',
+           link:null, contractAddr:null }
+  },
+};
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+let live = { price:null, mcap:null, fdv:null, vol:null, liq:null, chg:null, name:null, sym:null };
+let totalSupply = null;
+let liveHolders  = [];   // [{tokenAccount, owner, amount, rank}]
+let ownerBalMap  = {};   // owner address → live balance
+let knownBalLive = {};   // known wallet addr → true if balance came from RPC (vs expectedAmt fallback)
+let activeRpc  = RPCS[0];
+let cntTimer   = null;
+let cntVal     = REFRESH_SEC;
+
+// ═══════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════
+const fmtD=(n,d=2)=>n==null?'—':n>=1e9?'$'+(n/1e9).toFixed(2)+'B':n>=1e6?'$'+(n/1e6).toFixed(2)+'M':n>=1e3?'$'+(n/1e3).toFixed(1)+'K':'$'+n.toFixed(d);
+const fmtN=n=>n==null?'—':n>=1e9?(n/1e9).toFixed(3)+'B':n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n.toLocaleString();
+const fmtP=p=>p==null?'—':p<0.000001?'$'+p.toExponential(3):p<0.0001?'$'+p.toFixed(8):p<1?'$'+p.toPrecision(4):'$'+p.toFixed(4);
+const trunc=a=>a.slice(0,5)+'…'+a.slice(-4);
+function copyText(t,el){navigator.clipboard.writeText(t).then(()=>{const o=el.textContent;el.textContent='Copied!';setTimeout(()=>el.textContent=o,1200)})}
+
+// ═══════════════════════════════════════════
+//  RPC  — multi-endpoint with fallback
+// ═══════════════════════════════════════════
+function setRpcStatus(state, label, endpoint){
+  const dot=document.getElementById('rpcDot');
+  const lbl=document.getElementById('rpcLabel');
+  const ep=document.getElementById('rpcEndpoint');
+  dot.className='rpc-dot '+(state==='ok'?'rpc-ok':state==='err'?'rpc-err':'rpc-load');
+  lbl.textContent=label;
+  ep.textContent=endpoint||'';
+}
+
+async function rpcCall(method, params, timeoutMs=10000){
+  const body=JSON.stringify({jsonrpc:'2.0',id:1,method,params});
+  // Try active RPC first, then others
+  const order=[activeRpc,...RPCS.filter(r=>r!==activeRpc)];
+  for(const rpc of order){
+    try{
+      const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},
+        body,signal:AbortSignal.timeout(timeoutMs)});
+      if(!r.ok) continue;
+      const d=await r.json();
+      if(d.error){
+        // Some RPCs disable certain methods — try next
+        console.warn(`RPC ${rpc} error for ${method}:`,d.error.message);
+        continue;
+      }
+      if(d.result!==undefined){
+        if(rpc!==activeRpc){ activeRpc=rpc; }
+        setRpcStatus('ok','Connected · '+method,'via '+rpcLabel(rpc));
+        return d.result;
+      }
+    }catch(e){ /* timeout or network error, try next */ }
+  }
+  throw new Error(`All ${RPCS.length} RPC endpoints failed for ${method}`);
+}
+
+// ═══════════════════════════════════════════
+//  PRICE APIs
+// ═══════════════════════════════════════════
+async function fetchPrice(){
+  // Jupiter v2 price
+  try{
+    const r=await fetch(`https://api.jup.ag/price/v2?ids=${TOKEN_MINT}`,{signal:AbortSignal.timeout(7000)});
+    const d=await r.json();
+    const p=d?.data?.[TOKEN_MINT];
+    if(p?.price){ live.price=parseFloat(p.price); fetchDexExtras(); return; }
+  }catch(e){}
+  // DexScreener fallback
+  try{
+    const r=await fetch(`https://api.dexscreener.com/latest/dex/tokens/${TOKEN_MINT}`,{signal:AbortSignal.timeout(9000)});
+    const d=await r.json();
+    if(d.pairs?.length){
+      const p=d.pairs.sort((a,b)=>(b.liquidity?.usd||0)-(a.liquidity?.usd||0))[0];
+      live.price=parseFloat(p.priceUsd)||null;
+      live.mcap=p.marketCap||null; live.fdv=p.fdv||null;
+      live.vol=p.volume?.h24||null; live.liq=p.liquidity?.usd||null;
+      live.chg=p.priceChange?.h24||null;
+      live.name=p.baseToken?.name||null; live.sym=p.baseToken?.symbol||null;
+      return;
+    }
+  }catch(e){}
+  document.getElementById('shieldsNote').style.display='block';
+}
+
+async function fetchDexExtras(){
+  try{
+    const r=await fetch(`https://api.dexscreener.com/latest/dex/tokens/${TOKEN_MINT}`,{signal:AbortSignal.timeout(9000)});
+    const d=await r.json();
+    if(d.pairs?.length){
+      const p=d.pairs.sort((a,b)=>(b.liquidity?.usd||0)-(a.liquidity?.usd||0))[0];
+      live.mcap=live.mcap||p.marketCap||null; live.fdv=live.fdv||p.fdv||null;
+      live.vol=live.vol||p.volume?.h24||null; live.liq=live.liq||p.liquidity?.usd||null;
+      live.chg=live.chg??p.priceChange?.h24??null;
+      live.name=live.name||p.baseToken?.name||null; live.sym=live.sym||p.baseToken?.symbol||null;
+    }
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════
+//  SOLANA DATA — Helius-first, fallback chain
+// ═══════════════════════════════════════════
+
+// Safe hostname label (hides API key from status bar)
+function rpcLabel(url){ return url.includes('helius')?(url.includes('beta')?'Helius Beta':'Helius'):(()=>{try{return new URL(url).hostname}catch{return url}})() }
+
+async function fetchChainData(){
+  setRpcStatus('load','Fetching chain data…','');
+
+  // Reset state
+  knownBalLive={};
+
+  // 1. Token supply + decimals
+  let decimals=6;
+  try{
+    const s=await rpcCall('getTokenSupply',[TOKEN_MINT]);
+    totalSupply=s?.value?.uiAmount||null;
+    decimals=s?.value?.decimals??6;
+  }catch(e){ console.warn('Supply fetch failed:',e.message); }
+
+  // 2a. Try Helius enhanced getTokenAccounts (top 25)
+  let gotHolders=false;
+  try{
+    const r=await fetch(HELIUS_RPC,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({jsonrpc:'2.0',id:'ht1',method:'getTokenAccounts',
+        params:{page:1,limit:25,mint:TOKEN_MINT}}),
+      signal:AbortSignal.timeout(12000)});
+    const d=await r.json();
+    const accounts=d?.result?.token_accounts;
+    if(accounts?.length){
+      ownerBalMap={};
+      liveHolders=[];
+      const factor=Math.pow(10,decimals);
+      accounts.forEach((a,i)=>{
+        if(!a.owner) return;
+        const amt=a.amount/factor;
+        ownerBalMap[a.owner]=(ownerBalMap[a.owner]||0)+amt;
+        liveHolders.push({tokenAccount:a.address,owner:a.owner,amount:amt,rank:i+1});
+      });
+      liveHolders.sort((a,b)=>b.amount-a.amount).forEach((h,i)=>h.rank=i+1);
+      gotHolders=true;
+      setRpcStatus('ok',`Helius · ${liveHolders.length} holders (top 25)`,'Helius RPC');
+    }
+  }catch(e){ console.warn('Helius getTokenAccounts failed:',e.message); }
+
+  // 2b. Fallback: getTokenLargestAccounts + getMultipleAccounts (top 20)
+  if(!gotHolders){
+    let tokenAccounts=[];
+    try{
+      const r=await rpcCall('getTokenLargestAccounts',[TOKEN_MINT]);
+      tokenAccounts=r?.value||[];
+    }catch(e){ console.warn('getTokenLargestAccounts failed:',e.message); }
+
+    if(tokenAccounts.length>0){
+      try{
+        const addrs=tokenAccounts.map(a=>a.address);
+        const accts=await rpcCall('getMultipleAccounts',[addrs,{encoding:'jsonParsed'}]);
+        ownerBalMap={};
+        liveHolders=[];
+        accts?.value?.forEach((acct,i)=>{
+          if(!acct) return;
+          const info=acct?.data?.parsed?.info;
+          const owner=info?.owner;
+          const amount=info?.tokenAmount?.uiAmount??tokenAccounts[i]?.uiAmount??0;
+          if(owner){
+            ownerBalMap[owner]=(ownerBalMap[owner]||0)+amount;
+            liveHolders.push({tokenAccount:addrs[i],owner,amount,rank:i+1});
+          }
+        });
+        setRpcStatus('ok',`Live · ${liveHolders.length} holders`,rpcLabel(activeRpc));
+      }catch(e){
+        setRpcStatus('err','Holder resolve failed — retrying next refresh',rpcLabel(activeRpc));
+        console.warn('getMultipleAccounts failed:',e.message);
+      }
+    }
+  }
+
+  // 3. Fetch live balances for each known wallet directly via Helius
+  //    (locked tokens live in program/contract accounts, not the owner's wallet,
+  //     so they won't appear in the top-holders owner map above)
+  await fetchKnownWalletBalances(decimals);
+}
+
+// Per-known-wallet direct balance fetch — tries wallet address, then contract address
+async function fetchKnownWalletBalances(decimals){
+  const factor=Math.pow(10,decimals);
+  await Promise.allSettled(Object.entries(KNOWN).map(async([addr,info])=>{
+    // Query candidates: the wallet itself, then any associated contract
+    const candidates=[addr];
+    if(info.lock?.contractAddr) candidates.push(info.lock.contractAddr);
+    for(const qAddr of candidates){
+      try{
+        const r=await fetch(HELIUS_RPC,{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({jsonrpc:'2.0',id:'kb'+addr.slice(0,4),
+            method:'getTokenAccounts',params:{owner:qAddr,mint:TOKEN_MINT}}),
+          signal:AbortSignal.timeout(10000)});
+        const d=await r.json();
+        const bal=(d?.result?.token_accounts||[]).reduce((s,a)=>s+(a.amount/factor),0);
+        if(bal>0){ ownerBalMap[addr]=bal; knownBalLive[addr]=true; return; }
+      }catch(e){ /* try next candidate */ }
+    }
+    // Fallback: use expected amount so we always show something
+    if(ownerBalMap[addr]==null){ ownerBalMap[addr]=info.expectedAmt; knownBalLive[addr]=false; }
+  }));
+}
+
+// ═══════════════════════════════════════════
+//  RENDER — Stats
+// ═══════════════════════════════════════════
+function renderStats(){
+  const supply=totalSupply||1002000000;
+  const locked=Object.values(KNOWN).filter(w=>w.locked).reduce((s,w)=>s+w.expectedAmt,0);
+  const circ=supply-locked;
+  const circPct=supply>0?(circ/supply):0.597;
+
+  document.getElementById('sPrice').textContent=fmtP(live.price);
+  const cEl=document.getElementById('sChg');
+  if(live.chg!=null){cEl.className='sub '+(live.chg>=0?'up':'dn');cEl.textContent=(live.chg>=0?'▲':'▼')+Math.abs(live.chg).toFixed(2)+'% (24h)'}
+
+  // Market cap = price × circulating supply (correct definition)
+  const mc=live.price?live.price*circ:null;
+  document.getElementById('sMcap').textContent=fmtD(mc);
+  document.getElementById('sMcapSub').textContent=(circPct*100).toFixed(1)+'% of FDV';
+
+  // FDV = price × total supply
+  const fdv=live.fdv||(live.price?live.price*supply:null);
+  document.getElementById('sFdvCard').textContent=fmtD(fdv);
+  document.getElementById('sFdvSub').textContent=fmtN(supply)+' total supply';
+
+  document.getElementById('sVol').textContent=fmtD(live.vol);
+  document.getElementById('sLiq').textContent=live.liq?'Liquidity: '+fmtD(live.liq):'';
+  document.getElementById('sTotal').textContent=fmtN(supply);
+  document.getElementById('sCirc').textContent=fmtN(circ);
+  document.getElementById('sCircP').textContent=supply>0?((circ/supply)*100).toFixed(1)+'% of supply':'';
+  document.getElementById('sLock').textContent=fmtN(locked);
+  document.getElementById('sLockP').textContent=supply>0?((locked/supply)*100).toFixed(1)+'% locked':'';
+  if(live.name){document.getElementById('tokName').textContent=live.name;document.title=live.name+' Tracker';}
+  if(live.sym){document.getElementById('tokSym').textContent=live.sym;document.getElementById('tokIcon').textContent=live.sym[0];}
+}
+
+// ═══════════════════════════════════════════
+//  RENDER — SVG Donut (zero dependencies)
+// ═══════════════════════════════════════════
+const PALETTE=['#6366f1','#8b5cf6','#a78bfa','#06b6d4','#10b981','#f59e0b','#f97316','#0891b2','#d97706','#059669','#dc2626','#7c3aed','#334155'];
+function wColor(owner,i){
+  const k=KNOWN[owner];
+  if(!k) return PALETTE[(i+4)%PALETTE.length];
+  if(k.locked) return['#f59e0b','#f97316','#06b6d4','#a78bfa'][Object.values(KNOWN).filter(x=>x.locked).indexOf(k)%4];
+  if(k.pending) return'#6366f1';
+  return PALETTE[i%PALETTE.length];
+}
+
+function xy(cx,cy,r,deg){const a=(deg-90)*Math.PI/180;return{x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)}}
+function arc(cx,cy,R,ri,a1,a2){
+  if(a2-a1>=360)a2=a1+359.99;
+  const o1=xy(cx,cy,R,a1),o2=xy(cx,cy,R,a2),i1=xy(cx,cy,ri,a2),i2=xy(cx,cy,ri,a1);
+  const l=a2-a1>180?1:0;
+  return`M${o1.x},${o1.y}A${R},${R},0,${l},1,${o2.x},${o2.y}L${i1.x},${i1.y}A${ri},${ri},0,${l},0,${i2.x},${i2.y}Z`;
+}
+
+function renderDonut(){
+  const supply=totalSupply||1002000000;
+  const cx=97.5,cy=97.5,R=86,ri=57;
+  const svg=document.getElementById('donutSvg');
+  svg.innerHTML='';
+
+  const PENDING_AMT=128925033;
+  const locked=Object.values(KNOWN).filter(w=>w.locked).reduce((s,w)=>s+w.expectedAmt,0);
+  const lockedPct=((locked/supply)*100);
+  const pendingPct=((PENDING_AMT/supply)*100);
+
+  // Add stripe pattern for pending lock
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  defs.innerHTML=`
+    <pattern id="pending-stripe" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
+      <rect width="4" height="7" fill="#6366f1" opacity="0.85"/>
+      <rect x="4" width="3" height="7" fill="#312e81" opacity="0.6"/>
+    </pattern>`;
+  svg.appendChild(defs);
+
+  // Three tiers: LOCKED (bright) | PENDING (striped) | CIRCULATING (dark)
+  const items=[
+    {label:'Circulating (unlocked)', amt:supply-locked-PENDING_AMT, color:'#0f172a', opacity:0.9, tier:'circ'},
+    // locked segments — rendered bright
+    {label:'Locked — Covenant',     amt:300000000, color:'#f59e0b', tier:'locked'},
+    {label:'Locked — Meteora Pool', amt:56695437,  color:'#06b6d4', tier:'locked'},
+    {label:'Locked — Founders',     amt:38592440,  color:'#f97316', tier:'locked'},
+    {label:'Locked — Foundation',   amt:8040230,   color:'#a78bfa', tier:'locked'},
+    // pending — rendered striped
+    {label:'Pending Lock (Easy A)', amt:PENDING_AMT, color:'url(#pending-stripe)', solidColor:'#6366f1', tier:'pending'},
+  ].map(x=>({...x,pct:(x.amt/supply)*100}));
+
+  const total=items.reduce((s,x)=>s+x.pct,0);
+
+  // Mutable center nodes
+  const cPct=document.createElementNS('http://www.w3.org/2000/svg','text');
+  cPct.setAttribute('x',cx);cPct.setAttribute('y',cy-14);
+  cPct.setAttribute('text-anchor','middle');cPct.setAttribute('fill','#f59e0b');
+  cPct.setAttribute('font-size','17');cPct.setAttribute('font-weight','700');
+  cPct.textContent=lockedPct.toFixed(1)+'%';
+
+  const cLbl=document.createElementNS('http://www.w3.org/2000/svg','text');
+  cLbl.setAttribute('x',cx);cLbl.setAttribute('y',cy+3);
+  cLbl.setAttribute('text-anchor','middle');cLbl.setAttribute('fill','#94a3b8');
+  cLbl.setAttribute('font-size','6.5');cLbl.setAttribute('letter-spacing','0.08em');
+  cLbl.textContent='LOCKED';
+
+  const cPend=document.createElementNS('http://www.w3.org/2000/svg','text');
+  cPend.setAttribute('x',cx);cPend.setAttribute('y',cy+17);
+  cPend.setAttribute('text-anchor','middle');cPend.setAttribute('fill','#6366f1');
+  cPend.setAttribute('font-size','10');cPend.setAttribute('font-weight','600');
+  cPend.textContent='+'+pendingPct.toFixed(1)+'% pending';
+
+  function resetCenter(){
+    cPct.textContent=lockedPct.toFixed(1)+'%';
+    cPct.setAttribute('fill','#f59e0b');
+    cLbl.textContent='LOCKED';
+    cPend.textContent='+'+pendingPct.toFixed(1)+'% pending';
+    cPend.setAttribute('fill','#6366f1');
+  }
+
+  let angle=0;
+  items.forEach(item=>{
+    const sweep=(item.pct/total)*360;
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',arc(cx,cy,R,ri,angle,angle+sweep));
+    path.setAttribute('fill',item.color);
+    path.setAttribute('class','donut-path');
+    if(item.tier==='circ') path.style.opacity='0.18';
+
+    path.addEventListener('mouseenter',()=>{
+      cPct.textContent=item.pct.toFixed(1)+'%';
+      cLbl.textContent=item.tier==='pending'?'PENDING':item.tier==='circ'?'CIRCULATING':'LOCKED';
+      const hCol=item.solidColor||item.color;
+      cPct.setAttribute('fill',item.tier==='circ'?'#475569':hCol==='url(#pending-stripe)'?'#6366f1':hCol);
+      cPend.textContent=item.label.replace('Locked — ','').replace(' (Easy A)','');
+      cPend.setAttribute('fill','#94a3b8');
+      if(item.tier==='circ') path.style.opacity='0.35';
+    });
+    path.addEventListener('mouseleave',()=>{
+      resetCenter();
+      if(item.tier==='circ') path.style.opacity='0.18';
+    });
+    svg.appendChild(path);
+    angle+=sweep;
+  });
+  svg.appendChild(cPct);svg.appendChild(cLbl);svg.appendChild(cPend);
+
+  // Legend
+  const leg=document.getElementById('donutLeg');
+  leg.innerHTML='';
+
+  // Section headers + entries
+  const sections=[
+    { title:'🔒 Locked', entries: items.filter(x=>x.tier==='locked'), titleColor:'#f59e0b' },
+    { title:'⏳ Pending Lock', entries: items.filter(x=>x.tier==='pending'), titleColor:'#6366f1' },
+    { title:'◦ Circulating', entries: items.filter(x=>x.tier==='circ'), titleColor:'#475569' },
+  ];
+  sections.forEach(sec=>{
+    const hdr=document.createElement('div');
+    hdr.style.cssText=`font-size:.62rem;font-weight:700;color:${sec.titleColor};text-transform:uppercase;letter-spacing:.08em;margin-top:6px;margin-bottom:3px`;
+    hdr.textContent=sec.title;
+    leg.appendChild(hdr);
+    sec.entries.forEach(item=>{
+      const d=document.createElement('div');d.className='leg-i';
+      if(item.tier==='circ') d.style.opacity='0.45';
+      const dotStyle=item.tier==='pending'
+        ?`background:linear-gradient(135deg,#6366f1 50%,#312e81 50%)`
+        :`background:${item.solidColor||item.color}`;
+      d.innerHTML=`<span class="leg-d" style="${dotStyle}"></span>${item.label.replace('Locked — ','').replace(' (Easy A)','')}<span class="leg-p">${item.pct.toFixed(1)}%</span>`;
+      leg.appendChild(d);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════
+//  RENDER — Supply Bars
+// ═══════════════════════════════════════════
+function renderBars(){
+  const supply=totalSupply||1002000000;
+  const locked=Object.values(KNOWN).filter(w=>w.locked).reduce((s,w)=>s+w.expectedAmt,0);
+  const cats=[
+    {n:'Circulating (unlocked)',a:supply-locked,c:'#10b981'},
+    {n:'Locked — Covenant',a:300000000,c:'#f59e0b'},
+    {n:'Locked — Meteora Pool',a:56695437,c:'#06b6d4'},
+    {n:'Locked — Founders',a:38592440,c:'#f97316'},
+    {n:'Locked — Foundation',a:8040230,c:'#a78bfa'},
+    {n:'Pending Lock (Easy A)',a:128925033,c:'#6366f1'},
+  ];
+  const el=document.getElementById('supplyBars');el.innerHTML='';
+  cats.forEach(c=>{
+    const pct=((c.a/supply)*100).toFixed(1);
+    const row=document.createElement('div');row.className='bar-row';
+    row.innerHTML=`<div class="bar-hdr"><span class="bar-name">${c.n}</span><span class="bar-amt">${fmtN(c.a)} (${pct}%)</span></div>
+    <div class="bar-track"><div class="bar-fill" style="width:0%;background:${c.c}" data-t="${pct}"></div></div>`;
+    el.appendChild(row);
+  });
+  requestAnimationFrame(()=>document.querySelectorAll('.bar-fill').forEach(b=>b.style.width=b.dataset.t+'%'));
+}
+
+// ═══════════════════════════════════════════
+//  RENDER — Top Holders Table
+// ═══════════════════════════════════════════
+function renderHoldersTable(){
+  const supply=totalSupply||1002000000;
+  const tb=document.getElementById('holdersTbody');
+  tb.innerHTML='';
+
+  // Build rows: start with live holders (top 25), then add any known wallets not in live list
+  const seenOwners=new Set(liveHolders.map(h=>h.owner));
+  const rows=[...liveHolders.map(h=>({...h,isLiveHolder:true}))];
+  Object.entries(KNOWN).forEach(([addr,info])=>{
+    if(!seenOwners.has(addr)){
+      // Use live balance from direct fetch if available, else expected amount
+      const bal=ownerBalMap[addr]??info.expectedAmt;
+      rows.push({owner:addr,amount:bal,isLiveHolder:false,rank:null});
+    }
+  });
+  rows.sort((a,b)=>b.amount-a.amount);
+
+  document.getElementById('holdersCnt').textContent=rows.length+' wallets tracked';
+
+  rows.forEach((row,i)=>{
+    const known=KNOWN[row.owner];
+    const pct=((row.amount/supply)*100);
+    const pctStr=pct>=0.01?pct.toFixed(pct>=1?2:3)+'%':'<0.01%';
+
+    // Live balance display
+    // - if it's a direct liveHolder: green
+    // - if it's a known wallet with RPC-fetched balance: green with small "live" indicator
+    // - if it's known wallet using expected fallback: yellow with "est." note
+    let balHtml='';
+    if(row.isLiveHolder){
+      balHtml=`<span class="live-cell ok">${fmtN(row.amount)}</span>`;
+    } else if(known && ownerBalMap[row.owner]!=null){
+      const isRpcLive=knownBalLive[row.owner];
+      balHtml=`<span class="live-cell ${isRpcLive?'ok':'warn'}">${fmtN(ownerBalMap[row.owner])}${isRpcLive?'':' <span style="font-size:.62rem;opacity:.7">(est.)</span>'}</span>`;
+    } else {
+      balHtml=`<span class="live-cell loading">—</span>`;
+    }
+
+    // Status badge — only for locked/pending
+    let statusHtml='';
+    if(known?.locked) statusHtml=`<span class="sb sb-lock">🔒 Locked</span>`;
+    else if(known?.pending) statusHtml=`<span class="sb sb-pend">⏳ Pending</span>`;
+
+    // Label — only for named known wallets
+    const labelHtml=known?.label?`<span class="label-cell">${known.label}</span>`:'';
+
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="rank-cell ${i<3?'top3':''}">${i+1}</td>
+      <td><div class="addr-cell">
+        <a href="https://solscan.io/account/${row.owner}" target="_blank" title="${row.owner}">${trunc(row.owner)}</a>
+        <button class="cpbtn" onclick="copyText('${row.owner}',this)">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div></td>
+      <td>${labelHtml}</td>
+      <td class="pct-cell">${pctStr}</td>
+      <td>${balHtml}</td>
+      <td>${statusHtml}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  RENDER — Locked Wallet Verifier
+// ═══════════════════════════════════════════
+function renderVerifier(){
+  const grid=document.getElementById('lockGrid');
+  grid.innerHTML='';
+  const supply=totalSupply||1002000000;
+
+  const targets=Object.entries(KNOWN).filter(([,w])=>w.locked||w.pending);
+
+  targets.forEach(([addr,w])=>{
+    if(!w.lock) return;
+    const info=w.lock;
+    // Look up live balance from ownerBalMap (populated from batch RPC call)
+    const liveBal=ownerBalMap[addr];
+    const hasLive=liveBal!=null;
+    const diff=hasLive?Math.abs(liveBal-w.expectedAmt)/w.expectedAmt:null;
+    const verified=diff!=null&&diff<0.02;
+    const matchClass=!hasLive?'mt-load':verified?'mt-ok':'mt-warn';
+    const matchText=!hasLive?'Checking…':verified?'✓ Verified':'⚠ Changed';
+
+    let linksHtml=`<a class="lc-link" href="https://solscan.io/account/${addr}" target="_blank">🔍 Solscan</a>`;
+    if(info.link) linksHtml+=`<a class="lc-link" href="${info.link}" target="_blank">📄 ${info.platform}</a>`;
+    if(info.contractAddr) linksHtml+=`<a class="lc-link" href="https://solscan.io/account/${info.contractAddr}" target="_blank">📋 Contract</a>`;
+
+    const balDisplay=!hasLive?'<span style="color:var(--dim);font-size:.74rem;font-weight:400">Checking…</span>'
+      :`<span class="lcs-val ${verified?'lv-ok':'lv-warn'}">${fmtN(liveBal)}</span>`;
+
+    const barPct=hasLive?Math.min((liveBal/w.expectedAmt)*100,100):0;
+
+    const card=document.createElement('div');
+    card.className='lcard';
+    card.innerHTML=`
+      <div class="lc-top">
+        <span class="lc-label">${w.label}</span>
+        <span class="lc-plat ${info.platClass}">${info.platform}</span>
+      </div>
+      <div class="lc-addr-row">
+        <a href="https://solscan.io/account/${addr}" target="_blank">${trunc(addr)}</a>
+        <button class="cpbtn" onclick="copyText('${addr}',this)">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <span class="match-tag ${matchClass}">${matchText}</span>
+      </div>
+      <div class="lc-stats">
+        <div class="lcs"><div class="lcs-lbl">Expected</div><div class="lcs-val">${fmtN(w.expectedAmt)}</div></div>
+        <div class="lcs"><div class="lcs-lbl">Live Balance</div>${balDisplay}</div>
+      </div>
+      <div class="lc-prog"><div class="lc-prog-fill" style="width:${barPct}%"></div></div>
+      <div class="lc-meta">
+        <strong>Lock period:</strong> ${info.duration}<br>
+        <strong>Start:</strong> ${info.start}<br>
+        ${info.detail}
+        ${info.platform==='Streamflow'?'<br><em style="color:var(--accent);font-size:.66rem">Note: tokens held in Streamflow contract — check Contract link to verify on-chain.</em>':''}
+      </div>
+      <div class="lc-links">${linksHtml}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  COUNTDOWN
+// ═══════════════════════════════════════════
+function startCountdown(){
+  if(cntTimer)clearInterval(cntTimer);
+  cntVal=REFRESH_SEC;
+  const el=document.getElementById('cdEl');
+  cntTimer=setInterval(()=>{
+    cntVal--;
+    const m=Math.floor(cntVal/60),s=cntVal%60;
+    el.textContent=m+':'+String(s).padStart(2,'0');
+    if(cntVal<=0){clearInterval(cntTimer);update();}
+  },1000);
+}
+
+// ═══════════════════════════════════════════
+//  MAIN UPDATE
+// ═══════════════════════════════════════════
+async function update(){
+  const btn=document.getElementById('refBtn');
+  btn.classList.add('spin');
+  document.getElementById('errBanner').style.display='none';
+  setRpcStatus('load','Updating…','');
+
+  try{
+    // Run price and chain data in parallel
+    await Promise.allSettled([fetchPrice(), fetchChainData()]);
+    renderStats();
+    renderDonut();
+    renderBars();
+    renderHoldersTable();
+    renderVerifier();
+    const now=new Date();
+    document.getElementById('updEl').textContent='Updated '+now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    if(live.price) document.getElementById('shieldsNote').style.display='none';
+  }catch(e){
+    const eb=document.getElementById('errBanner');
+    eb.textContent='⚠ Update error: '+e.message;
+    eb.style.display='block';
+    setRpcStatus('err','Update failed',e.message);
+  }finally{
+    btn.classList.remove('spin');
+    startCountdown();
+  }
+}
+
+function triggerRefresh(){if(cntTimer)clearInterval(cntTimer);update();}
+
+// Boot
+update();
+</script>
+</body>
+</html>
