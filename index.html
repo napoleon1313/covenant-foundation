@@ -454,61 +454,64 @@ async function fetchChainData(){
     decimals=s?.value?.decimals??6;
   }catch(e){ console.warn('Supply fetch failed:',e.message); }
 
-  // 2a. Try Helius enhanced getTokenAccounts (top 25)
+  // 2a. PRIMARY: getTokenLargestAccounts (standard Solana — returns TRUE top holders sorted by balance,
+  //     same source used by Solscan/Explorer. Returns up to 20 accounts.)
   let gotHolders=false;
+  let tokenAccounts=[];
   try{
-    const r=await fetch(HELIUS_RPC,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({jsonrpc:'2.0',id:'ht1',method:'getTokenAccounts',
-        params:{page:1,limit:25,mint:TOKEN_MINT}}),
-      signal:AbortSignal.timeout(12000)});
-    const d=await r.json();
-    const accounts=d?.result?.token_accounts;
-    if(accounts?.length){
+    const r=await rpcCall('getTokenLargestAccounts',[TOKEN_MINT]);
+    tokenAccounts=r?.value||[];
+  }catch(e){ console.warn('getTokenLargestAccounts failed:',e.message); }
+
+  if(tokenAccounts.length>0){
+    try{
+      const addrs=tokenAccounts.map(a=>a.address);
+      const accts=await rpcCall('getMultipleAccounts',[addrs,{encoding:'jsonParsed'}]);
       ownerBalMap={};
       liveHolders=[];
-      const factor=Math.pow(10,decimals);
-      accounts.forEach((a,i)=>{
-        if(!a.owner) return;
-        const amt=a.amount/factor;
-        ownerBalMap[a.owner]=(ownerBalMap[a.owner]||0)+amt;
-        liveHolders.push({tokenAccount:a.address,owner:a.owner,amount:amt,rank:i+1});
+      accts?.value?.forEach((acct,i)=>{
+        if(!acct) return;
+        const info=acct?.data?.parsed?.info;
+        const owner=info?.owner;
+        const amount=info?.tokenAmount?.uiAmount??tokenAccounts[i]?.uiAmount??0;
+        if(owner){
+          ownerBalMap[owner]=(ownerBalMap[owner]||0)+amount;
+          liveHolders.push({tokenAccount:addrs[i],owner,amount,rank:i+1});
+        }
       });
       liveHolders.sort((a,b)=>b.amount-a.amount).forEach((h,i)=>h.rank=i+1);
       gotHolders=true;
-      setRpcStatus('ok',`Helius · ${liveHolders.length} holders (top 25)`,'Helius RPC');
+      setRpcStatus('ok',`Live · top ${liveHolders.length} holders`,rpcLabel(activeRpc));
+    }catch(e){
+      setRpcStatus('err','Holder resolve failed — retrying next refresh',rpcLabel(activeRpc));
+      console.warn('getMultipleAccounts failed:',e.message);
     }
-  }catch(e){ console.warn('Helius getTokenAccounts failed:',e.message); }
+  }
 
-  // 2b. Fallback: getTokenLargestAccounts + getMultipleAccounts (top 20)
+  // 2b. Fallback: Helius getTokenAccounts (less reliable sort — used only if primary fails)
   if(!gotHolders){
-    let tokenAccounts=[];
     try{
-      const r=await rpcCall('getTokenLargestAccounts',[TOKEN_MINT]);
-      tokenAccounts=r?.value||[];
-    }catch(e){ console.warn('getTokenLargestAccounts failed:',e.message); }
-
-    if(tokenAccounts.length>0){
-      try{
-        const addrs=tokenAccounts.map(a=>a.address);
-        const accts=await rpcCall('getMultipleAccounts',[addrs,{encoding:'jsonParsed'}]);
+      const r=await fetch(HELIUS_RPC,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({jsonrpc:'2.0',id:'ht1',method:'getTokenAccounts',
+          params:{page:1,limit:25,mint:TOKEN_MINT}}),
+        signal:AbortSignal.timeout(12000)});
+      const d=await r.json();
+      const accounts=d?.result?.token_accounts;
+      if(accounts?.length){
         ownerBalMap={};
         liveHolders=[];
-        accts?.value?.forEach((acct,i)=>{
-          if(!acct) return;
-          const info=acct?.data?.parsed?.info;
-          const owner=info?.owner;
-          const amount=info?.tokenAmount?.uiAmount??tokenAccounts[i]?.uiAmount??0;
-          if(owner){
-            ownerBalMap[owner]=(ownerBalMap[owner]||0)+amount;
-            liveHolders.push({tokenAccount:addrs[i],owner,amount,rank:i+1});
-          }
+        const factor=Math.pow(10,decimals);
+        accounts.forEach((a,i)=>{
+          if(!a.owner) return;
+          const amt=a.amount/factor;
+          ownerBalMap[a.owner]=(ownerBalMap[a.owner]||0)+amt;
+          liveHolders.push({tokenAccount:a.address,owner:a.owner,amount:amt,rank:i+1});
         });
-        setRpcStatus('ok',`Live · ${liveHolders.length} holders`,rpcLabel(activeRpc));
-      }catch(e){
-        setRpcStatus('err','Holder resolve failed — retrying next refresh',rpcLabel(activeRpc));
-        console.warn('getMultipleAccounts failed:',e.message);
+        liveHolders.sort((a,b)=>b.amount-a.amount).forEach((h,i)=>h.rank=i+1);
+        gotHolders=true;
+        setRpcStatus('ok',`Helius · ${liveHolders.length} holders`,'Helius RPC');
       }
-    }
+    }catch(e){ console.warn('Helius getTokenAccounts failed:',e.message); }
   }
 
   // 3. Fetch live balances for each known wallet directly via Helius
