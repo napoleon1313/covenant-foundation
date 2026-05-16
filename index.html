@@ -90,7 +90,9 @@ main{position:relative;z-index:5;padding:22px 28px;max-width:1440px;margin:0 aut
 .badge.live-badge{color:var(--green);border-color:rgba(16,185,129,.3)}
 
 /* Table */
-.tbl-wrap{overflow-x:auto}
+.tbl-wrap{overflow-x:auto;position:relative}
+.tbl-scroll-outer{overflow:hidden;max-height:480px;position:relative}
+.tbl-scroll-inner{transition:transform 0s}
 table{width:100%;border-collapse:collapse;font-size:.79rem}
 thead th{color:var(--muted);font-weight:500;font-size:.64rem;text-transform:uppercase;letter-spacing:.07em;padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
 tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s}
@@ -231,9 +233,12 @@ footer a{color:var(--accent);text-decoration:none}
       <div style="display:flex;gap:8px;align-items:center">
         <span class="badge live-badge" id="holdersBadge">● Live</span>
         <span class="badge" id="holdersCnt">Loading…</span>
+        <button id="scrollToggle" onclick="toggleScroll()" style="font-size:.65rem;background:var(--bg3);border:1px solid var(--border);color:var(--muted);padding:3px 9px;border-radius:999px;cursor:pointer;transition:all .2s" title="Toggle auto-scroll">⏸ Pause</button>
       </div>
     </div>
     <div class="tbl-wrap">
+      <div class="tbl-scroll-outer" id="scrollOuter">
+      <div class="tbl-scroll-inner" id="scrollInner">
       <table>
         <thead><tr>
           <th style="width:36px">#</th>
@@ -245,11 +250,13 @@ footer a{color:var(--accent);text-decoration:none}
         </tr></thead>
         <tbody id="holdersTbody"></tbody>
       </table>
-    </div>
+      </div><!-- /scrollInner -->
+      </div><!-- /scrollOuter -->
+    </div><!-- /tbl-wrap -->
     <div style="font-size:.67rem;color:var(--dim);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-      ⓘ Top 50 holders fetched live via Helius RPC in a single batch call. Falls back to standard Solana RPC (top 20) if Helius is unavailable.
+      ⓘ Top 25 holders fetched live via Solana RPC using <code style="font-family:monospace;font-size:.65rem">getTokenLargestAccounts</code> — same source as Solscan/Explorer.
     </div>
-  </div>
+  </div><!-- /card -->
 
   <!-- Locked Wallet Verifier -->
   <div class="card">
@@ -308,7 +315,7 @@ const KNOWN = {
            detail:'Primary community & governance treasury. Full 12-month cliff on Streamflow — zero tokens released before lock expiry. On-chain verifiable. Post-cliff release subject to governance vote for renewal or structured linear vesting.',
            link:SF_URL, contractAddr:SF_CONTRACT }
   },
-  '2SMBrCJAYKnpLBgnJBvizgFu98nZPTpZCsVNzR6LVrBm': {
+  '2wimh5JcAgF4MQtdXvK3an19R53jAqEZNNFgMjFn7KD1': {
     label:'Easy A Kickstarter Treasury (market bought)', locked:true, pending:false,
     expectedAmt:128925033, expectedPct:12.89,
     lock:{ platform:'Streamflow', platClass:'p-sf',
@@ -914,6 +921,42 @@ function renderVerifier(){
 }
 
 // ═══════════════════════════════════════════
+//  AUTO-SCROLL TABLE
+// ═══════════════════════════════════════════
+let scrollPaused = false;
+let scrollRAF    = null;
+let scrollPos    = 0;
+const SCROLL_PX_PER_FRAME = 0.45; // ~27px/sec @ 60fps — slow enough to read
+
+function startTableScroll(){
+  if(scrollRAF) cancelAnimationFrame(scrollRAF);
+  function tick(){
+    if(!scrollPaused){
+      const inner = document.getElementById('scrollInner');
+      const outer = document.getElementById('scrollOuter');
+      if(inner && outer){
+        const innerH = inner.scrollHeight;
+        const outerH = outer.clientHeight;
+        if(innerH > outerH){
+          scrollPos += SCROLL_PX_PER_FRAME;
+          // Seamless loop — when we've scrolled past the content, reset
+          if(scrollPos >= innerH - outerH) scrollPos = 0;
+          inner.style.transform = `translateY(-${scrollPos.toFixed(2)}px)`;
+        }
+      }
+    }
+    scrollRAF = requestAnimationFrame(tick);
+  }
+  scrollRAF = requestAnimationFrame(tick);
+}
+
+function toggleScroll(){
+  scrollPaused = !scrollPaused;
+  const btn = document.getElementById('scrollToggle');
+  if(btn) btn.textContent = scrollPaused ? '▶ Resume' : '⏸ Pause';
+}
+
+// ═══════════════════════════════════════════
 //  COUNTDOWN
 // ═══════════════════════════════════════════
 function startCountdown(){
@@ -962,7 +1005,7 @@ async function update(){
 function triggerRefresh(){if(cntTimer)clearInterval(cntTimer);update();}
 
 // Boot
-update();
+update().then(() => startTableScroll());
 </script>
 </body>
 </html>
