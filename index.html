@@ -91,8 +91,6 @@ main{position:relative;z-index:5;padding:22px 28px;max-width:1440px;margin:0 aut
 
 /* Table */
 .tbl-wrap{overflow-x:auto;position:relative}
-.tbl-scroll-outer{overflow:hidden;max-height:480px;position:relative}
-.tbl-scroll-inner{transition:transform 0s}
 table{width:100%;border-collapse:collapse;font-size:.79rem}
 thead th{color:var(--muted);font-weight:500;font-size:.64rem;text-transform:uppercase;letter-spacing:.07em;padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
 tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s}
@@ -233,12 +231,9 @@ footer a{color:var(--accent);text-decoration:none}
       <div style="display:flex;gap:8px;align-items:center">
         <span class="badge live-badge" id="holdersBadge">● Live</span>
         <span class="badge" id="holdersCnt">Loading…</span>
-        <button id="scrollToggle" onclick="toggleScroll()" style="font-size:.65rem;background:var(--bg3);border:1px solid var(--border);color:var(--muted);padding:3px 9px;border-radius:999px;cursor:pointer;transition:all .2s" title="Toggle auto-scroll">⏸ Pause</button>
       </div>
     </div>
     <div class="tbl-wrap">
-      <div class="tbl-scroll-outer" id="scrollOuter">
-      <div class="tbl-scroll-inner" id="scrollInner">
       <table>
         <thead><tr>
           <th style="width:36px">#</th>
@@ -250,8 +245,6 @@ footer a{color:var(--accent);text-decoration:none}
         </tr></thead>
         <tbody id="holdersTbody"></tbody>
       </table>
-      </div><!-- /scrollInner -->
-      </div><!-- /scrollOuter -->
     </div><!-- /tbl-wrap -->
     <div style="font-size:.67rem;color:var(--dim);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
       ⓘ Top 25 holders fetched live via Solana RPC using <code style="font-family:monospace;font-size:.65rem">getTokenLargestAccounts</code> — same source as Solscan/Explorer.
@@ -330,6 +323,7 @@ const KNOWN = {
   },
   'HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC': {
     label:'Meteora Liq Pool', locked:true, pending:false,
+    lpPool:true,
     expectedAmt:56695437, expectedPct:5.6,
     lock:{ platform:'Meteora', platClass:'p-mt',
            duration:'Indefinite (protocol-locked LP)',
@@ -337,7 +331,7 @@ const KNOWN = {
            cliffMonths:0,
            linearMonths:0,
            start:'From pool creation',
-           detail:'Liquidity permanently locked in Meteora DLMM pool. Protocol-level lock — cannot be withdrawn unilaterally. Provides deep on-chain liquidity and price stability as per DeFi best practice.',
+           detail:'LP position permanently locked in Meteora pool — 100% of the LP shares are protocol-locked and cannot be withdrawn unilaterally. The CVT token count in the pool reserve fluctuates naturally with every trade (standard AMM behaviour: as CVT is bought, the pool\'s CVT reserves decrease and SOL/quote increases). The displayed live balance reflects current CVT held on the pool\'s reserve side only.',
            link:'https://app.meteora.ag/', contractAddr:null }
   },
   'F5E6DuMv78YhbtbzUpk3w3ahDLpHW53PEEBfTE8rD2Jb': {
@@ -853,9 +847,10 @@ function renderVerifier(){
     const liveBal=ownerBalMap[addr];
     const hasLive=liveBal!=null;
     const diff=hasLive?Math.abs(liveBal-w.expectedAmt)/w.expectedAmt:null;
-    const verified=diff!=null&&diff<0.02;
-    const matchClass=!hasLive?'mt-load':verified?'mt-ok':'mt-warn';
-    const matchText=!hasLive?'Checking…':verified?'✓ Verified':'⚠ Changed';
+    // LP pools: balance fluctuates with trading — don't flag as "Changed"
+    const verified=w.lpPool?(hasLive&&liveBal>0):(diff!=null&&diff<0.02);
+    const matchClass=!hasLive?'mt-load':verified?'mt-ok':(w.lpPool?'mt-ok':'mt-warn');
+    const matchText=!hasLive?'Checking…':w.lpPool?'✓ Pool Active':(verified?'✓ Verified':'⚠ Changed');
 
     let linksHtml=`<a class="lc-link" href="https://solscan.io/account/${addr}" target="_blank">🔍 Solscan</a>`;
     if(info.link) linksHtml+=`<a class="lc-link" href="${info.link}" target="_blank">📄 ${info.platform}</a>`;
@@ -921,42 +916,6 @@ function renderVerifier(){
 }
 
 // ═══════════════════════════════════════════
-//  AUTO-SCROLL TABLE
-// ═══════════════════════════════════════════
-let scrollPaused = false;
-let scrollRAF    = null;
-let scrollPos    = 0;
-const SCROLL_PX_PER_FRAME = 0.45; // ~27px/sec @ 60fps — slow enough to read
-
-function startTableScroll(){
-  if(scrollRAF) cancelAnimationFrame(scrollRAF);
-  function tick(){
-    if(!scrollPaused){
-      const inner = document.getElementById('scrollInner');
-      const outer = document.getElementById('scrollOuter');
-      if(inner && outer){
-        const innerH = inner.scrollHeight;
-        const outerH = outer.clientHeight;
-        if(innerH > outerH){
-          scrollPos += SCROLL_PX_PER_FRAME;
-          // Seamless loop — when we've scrolled past the content, reset
-          if(scrollPos >= innerH - outerH) scrollPos = 0;
-          inner.style.transform = `translateY(-${scrollPos.toFixed(2)}px)`;
-        }
-      }
-    }
-    scrollRAF = requestAnimationFrame(tick);
-  }
-  scrollRAF = requestAnimationFrame(tick);
-}
-
-function toggleScroll(){
-  scrollPaused = !scrollPaused;
-  const btn = document.getElementById('scrollToggle');
-  if(btn) btn.textContent = scrollPaused ? '▶ Resume' : '⏸ Pause';
-}
-
-// ═══════════════════════════════════════════
 //  COUNTDOWN
 // ═══════════════════════════════════════════
 function startCountdown(){
@@ -1005,7 +964,7 @@ async function update(){
 function triggerRefresh(){if(cntTimer)clearInterval(cntTimer);update();}
 
 // Boot
-update().then(() => startTableScroll());
+update();
 </script>
 </body>
 </html>
