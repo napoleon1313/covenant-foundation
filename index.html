@@ -766,15 +766,16 @@ function renderHoldersTable(){
   const tb=document.getElementById('holdersTbody');
   tb.innerHTML='';
 
-  // Build rows: start with live holders (top 25), then add any known wallets not in live list
-  const seenOwners=new Set(liveHolders.map(h=>h.owner));
-  const rows=[...liveHolders.map(h=>({...h,isLiveHolder:true}))];
-  Object.entries(KNOWN).forEach(([addr,info])=>{
-    if(!seenOwners.has(addr)){
-      // Use live balance from direct fetch if available, else expected amount
-      const bal=ownerBalMap[addr]??info.expectedAmt;
-      rows.push({owner:addr,amount:bal,isLiveHolder:false,rank:null});
-    }
+  // Build rows: live holders first, then any KNOWN wallets not already represented
+  const seenOwners = new Set(liveHolders.map(h => h.owner));
+  // Known wallets that appear via escrow alias are already in the live list — don't double-add
+  const aliasedKnown = new Set(Object.values(knownOwnerAliases));
+  const rows = [...liveHolders.map(h => ({...h, isLiveHolder:true}))];
+  Object.entries(KNOWN).forEach(([addr, info]) => {
+    if (seenOwners.has(addr)) return;      // directly in live list
+    if (aliasedKnown.has(addr)) return;    // represented via escrow alias — skip duplicate
+    const bal = ownerBalMap[addr] ?? info.expectedAmt;
+    rows.push({owner:addr, amount:bal, isLiveHolder:false, rank:null});
   });
   rows.sort((a,b)=>b.amount-a.amount);
 
