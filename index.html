@@ -299,36 +299,62 @@ const KNOWN = {
   'Ep6DQRtFcot3HaG5osN4gW3nmrtXCtUG6yVnKyF48pYp': {
     label:'Covenant Foundation', locked:true, pending:false,
     expectedAmt:300000000, expectedPct:30,
-    lock:{ platform:'Streamflow', platClass:'p-sf', duration:'12 months',
-           start:'From token launch', detail:'Community, team & market making allocation',
+    lock:{ platform:'Streamflow', platClass:'p-sf',
+           duration:'12-month cliff lock',
+           vestingType:'cliff',
+           cliffMonths:12,
+           linearMonths:0,
+           start:'From token launch',
+           detail:'Primary community & governance treasury. Full 12-month cliff on Streamflow — zero tokens released before lock expiry. On-chain verifiable. Post-cliff release subject to governance vote for renewal or structured linear vesting.',
            link:SF_URL, contractAddr:SF_CONTRACT }
   },
   '2SMBrCJAYKnpLBgnJBvizgFu98nZPTpZCsVNzR6LVrBm': {
-    label:'Easy A Kickstarter Treasury (market bought)', locked:false, pending:true,
+    label:'Easy A Kickstarter Treasury (market bought)', locked:true, pending:false,
     expectedAmt:128925033, expectedPct:12.89,
-    lock:{ platform:'Pending Lock', platClass:'p-pend', duration:'TBD',
-           start:'TBD', detail:'Will be locked upon tokenomics announcement',
-           link:null, contractAddr:null }
+    lock:{ platform:'Streamflow', platClass:'p-sf',
+           duration:'6-month cliff lock',
+           vestingType:'cliff',
+           cliffMonths:6,
+           linearMonths:0,
+           start:'May 2025',
+           detail:'Kickstarter treasury acquired entirely via open-market purchases. Locked for 6 months via Streamflow — zero tokens released before lock expiry. On-chain verifiable.',
+           link:'https://app.streamflow.finance/contract/solana/mainnet/3pS8ALiikBG3JchUZjFH1GuZeNe5eNmT4HG8PPCkMWLP',
+           contractAddr:'3pS8ALiikBG3JchUZjFH1GuZeNe5eNmT4HG8PPCkMWLP' }
   },
-  'HLnpSz9h2S4hiLQ43rnSCA7B8hQMKmDaiTLcC': {
+  '9ek7tngasfgykgujvrscloxsbuqt8suhqnvc2mjgaviq': {
     label:'Meteora Liq Pool', locked:true, pending:false,
     expectedAmt:56695437, expectedPct:5.6,
-    lock:{ platform:'Meteora', platClass:'p-mt', duration:'Indefinite',
-           start:'From pool creation', detail:'Locked LP position in Meteora DLMM pool',
+    lock:{ platform:'Meteora', platClass:'p-mt',
+           duration:'Indefinite (protocol-locked LP)',
+           vestingType:'indefinite',
+           cliffMonths:0,
+           linearMonths:0,
+           start:'From pool creation',
+           detail:'Liquidity permanently locked in Meteora DLMM pool. Protocol-level lock — cannot be withdrawn unilaterally. Provides deep on-chain liquidity and price stability as per DeFi best practice.',
            link:'https://app.meteora.ag/', contractAddr:null }
   },
   'F5E6DuMv78YhbtbzUpk3w3ahDLpHW53PEEBfTE8rD2Jb': {
     label:"Founders' Tokens", locked:true, pending:false,
     expectedAmt:38592440, expectedPct:3.85,
-    lock:{ platform:'Unknown', platClass:'p-unk', duration:'TBD',
-           start:'TBD', detail:'Founder team allocation',
+    lock:{ platform:'Streamflow', platClass:'p-sf',
+           duration:'12-month cliff + 36-month linear vesting',
+           vestingType:'cliff+linear',
+           cliffMonths:12,
+           linearMonths:36,
+           start:'From token launch',
+           detail:'Founder allocation structured to industry standard: 12-month cliff (no unlock), then linear monthly vesting over 36 months (~1.07M tokens/month). Total lock period: 48 months. Aligns founder incentives with long-term project health.',
            link:null, contractAddr:null }
   },
   '7mdeS3BkFNpd82nYpAM9x48DT5PB6LRoqnBJk6FGR5M6': {
-    label:'Covenant Foundation', locked:true, pending:false,
+    label:'Covenant Foundation Reserve', locked:true, pending:false,
     expectedAmt:8040230, expectedPct:0.804,
-    lock:{ platform:'Unknown', platClass:'p-unk', duration:'TBD',
-           start:'TBD', detail:'Covenant Foundation reserve allocation',
+    lock:{ platform:'Streamflow', platClass:'p-sf',
+           duration:'12-month cliff + 12-month linear vesting',
+           vestingType:'cliff+linear',
+           cliffMonths:12,
+           linearMonths:12,
+           start:'From token launch',
+           detail:'Operational reserve for Foundation activities (grants, audits, partnerships). 12-month cliff followed by 12-month linear vesting (~670K tokens/month). Ensures funds are available for development milestones without front-loaded pressure.',
            link:null, contractAddr:null }
   },
 };
@@ -603,58 +629,44 @@ function renderDonut(){
   const svg=document.getElementById('donutSvg');
   svg.innerHTML='';
 
-  const PENDING_AMT=128925033;
   const locked=Object.values(KNOWN).filter(w=>w.locked).reduce((s,w)=>s+w.expectedAmt,0);
   const lockedPct=((locked/supply)*100);
-  const pendingPct=((PENDING_AMT/supply)*100);
 
-  // Add stripe pattern for pending lock
-  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
-  defs.innerHTML=`
-    <pattern id="pending-stripe" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
-      <rect width="4" height="7" fill="#6366f1" opacity="0.85"/>
-      <rect x="4" width="3" height="7" fill="#312e81" opacity="0.6"/>
-    </pattern>`;
-  svg.appendChild(defs);
-
-  // Three tiers: LOCKED (bright) | PENDING (striped) | CIRCULATING (dark)
+  // Two tiers: LOCKED (bright) | CIRCULATING (dark)
   const items=[
-    {label:'Circulating (unlocked)', amt:supply-locked-PENDING_AMT, color:'#0f172a', opacity:0.9, tier:'circ'},
-    // locked segments — rendered bright
+    {label:'Circulating (unlocked)', amt:supply-locked, color:'#0f172a', tier:'circ'},
     {label:'Locked — Covenant Foundation', amt:308040230, color:'#f59e0b', tier:'locked'},
+    {label:'Locked — Easy A Kickstarter Treasury', amt:128925033, color:'#6366f1', tier:'locked'},
     {label:'Locked — Meteora Pool', amt:56695437,  color:'#06b6d4', tier:'locked'},
     {label:'Locked — Founders',     amt:38592440,  color:'#f97316', tier:'locked'},
-    // pending — rendered striped
-    {label:'Pending Lock (Easy A Kickstarter Treasury)', amt:PENDING_AMT, color:'url(#pending-stripe)', solidColor:'#6366f1', tier:'pending'},
   ].map(x=>({...x,pct:(x.amt/supply)*100}));
 
   const total=items.reduce((s,x)=>s+x.pct,0);
 
-  // Mutable center nodes
+  // Center label
   const cPct=document.createElementNS('http://www.w3.org/2000/svg','text');
-  cPct.setAttribute('x',cx);cPct.setAttribute('y',cy-14);
+  cPct.setAttribute('x',cx);cPct.setAttribute('y',cy-8);
   cPct.setAttribute('text-anchor','middle');cPct.setAttribute('fill','#f59e0b');
   cPct.setAttribute('font-size','17');cPct.setAttribute('font-weight','700');
   cPct.textContent=lockedPct.toFixed(1)+'%';
 
   const cLbl=document.createElementNS('http://www.w3.org/2000/svg','text');
-  cLbl.setAttribute('x',cx);cLbl.setAttribute('y',cy+3);
+  cLbl.setAttribute('x',cx);cLbl.setAttribute('y',cy+8);
   cLbl.setAttribute('text-anchor','middle');cLbl.setAttribute('fill','#94a3b8');
   cLbl.setAttribute('font-size','6.5');cLbl.setAttribute('letter-spacing','0.08em');
   cLbl.textContent='LOCKED';
 
-  const cPend=document.createElementNS('http://www.w3.org/2000/svg','text');
-  cPend.setAttribute('x',cx);cPend.setAttribute('y',cy+17);
-  cPend.setAttribute('text-anchor','middle');cPend.setAttribute('fill','#6366f1');
-  cPend.setAttribute('font-size','10');cPend.setAttribute('font-weight','600');
-  cPend.textContent='+'+pendingPct.toFixed(1)+'% pending';
+  const cSub=document.createElementNS('http://www.w3.org/2000/svg','text');
+  cSub.setAttribute('x',cx);cSub.setAttribute('y',cy+20);
+  cSub.setAttribute('text-anchor','middle');cSub.setAttribute('fill','#475569');
+  cSub.setAttribute('font-size','6');
+  cSub.textContent='';
 
   function resetCenter(){
     cPct.textContent=lockedPct.toFixed(1)+'%';
     cPct.setAttribute('fill','#f59e0b');
     cLbl.textContent='LOCKED';
-    cPend.textContent='+'+pendingPct.toFixed(1)+'% pending';
-    cPend.setAttribute('fill','#6366f1');
+    cSub.textContent='';
   }
 
   let angle=0;
@@ -668,11 +680,9 @@ function renderDonut(){
 
     path.addEventListener('mouseenter',()=>{
       cPct.textContent=item.pct.toFixed(1)+'%';
-      cLbl.textContent=item.tier==='pending'?'PENDING':item.tier==='circ'?'CIRCULATING':'LOCKED';
-      const hCol=item.solidColor||item.color;
-      cPct.setAttribute('fill',item.tier==='circ'?'#475569':hCol==='url(#pending-stripe)'?'#6366f1':hCol);
-      cPend.textContent=item.label.replace('Locked — ','').replace(' (Easy A)','');
-      cPend.setAttribute('fill','#94a3b8');
+      cLbl.textContent=item.tier==='circ'?'CIRCULATING':'LOCKED';
+      cPct.setAttribute('fill',item.tier==='circ'?'#475569':item.color);
+      cSub.textContent=item.label.replace('Locked — ','');
       if(item.tier==='circ') path.style.opacity='0.35';
     });
     path.addEventListener('mouseleave',()=>{
@@ -682,16 +692,14 @@ function renderDonut(){
     svg.appendChild(path);
     angle+=sweep;
   });
-  svg.appendChild(cPct);svg.appendChild(cLbl);svg.appendChild(cPend);
+  svg.appendChild(cPct);svg.appendChild(cLbl);svg.appendChild(cSub);
 
   // Legend
   const leg=document.getElementById('donutLeg');
   leg.innerHTML='';
 
-  // Section headers + entries
   const sections=[
     { title:'🔒 Locked', entries: items.filter(x=>x.tier==='locked'), titleColor:'#f59e0b' },
-    { title:'⏳ Pending Lock', entries: items.filter(x=>x.tier==='pending'), titleColor:'#6366f1' },
     { title:'◦ Circulating', entries: items.filter(x=>x.tier==='circ'), titleColor:'#475569' },
   ];
   sections.forEach(sec=>{
@@ -702,10 +710,7 @@ function renderDonut(){
     sec.entries.forEach(item=>{
       const d=document.createElement('div');d.className='leg-i';
       if(item.tier==='circ') d.style.opacity='0.45';
-      const dotStyle=item.tier==='pending'
-        ?`background:linear-gradient(135deg,#6366f1 50%,#312e81 50%)`
-        :`background:${item.solidColor||item.color}`;
-      d.innerHTML=`<span class="leg-d" style="${dotStyle}"></span>${item.label.replace('Locked — ','').replace(' (Easy A)','')}<span class="leg-p">${item.pct.toFixed(1)}%</span>`;
+      d.innerHTML=`<span class="leg-d" style="background:${item.color}"></span>${item.label.replace('Locked — ','')}<span class="leg-p">${item.pct.toFixed(1)}%</span>`;
       leg.appendChild(d);
     });
   });
@@ -720,9 +725,9 @@ function renderBars(){
   const cats=[
     {n:'Circulating (unlocked)',a:supply-locked,c:'#10b981'},
     {n:'Locked — Covenant Foundation',a:308040230,c:'#f59e0b'},
+    {n:'Locked — Easy A Kickstarter Treasury',a:128925033,c:'#6366f1'},
     {n:'Locked — Meteora Pool',a:56695437,c:'#06b6d4'},
     {n:'Locked — Founders',a:38592440,c:'#f97316'},
-    {n:'Pending Lock (Easy A Kickstarter Treasury)',a:128925033,c:'#6366f1'},
   ];
   const el=document.getElementById('supplyBars');el.innerHTML='';
   cats.forEach(c=>{
@@ -850,12 +855,36 @@ function renderVerifier(){
         <div class="lcs"><div class="lcs-lbl">Live Balance</div>${balDisplay}</div>
       </div>
       <div class="lc-prog"><div class="lc-prog-fill" style="width:${barPct}%"></div></div>
-      <div class="lc-meta">
-        <strong>Lock period:</strong> ${info.duration}<br>
-        <strong>Start:</strong> ${info.start}<br>
-        ${info.detail}
-        ${info.platform==='Streamflow'?'<br><em style="color:var(--accent);font-size:.66rem">Note: tokens held in Streamflow contract — check Contract link to verify on-chain.</em>':''}
-      </div>
+      ${(()=>{
+        const cliff=info.cliffMonths||0;
+        const linear=info.linearMonths||0;
+        const total=cliff+linear||1;
+        const cliffPct=(cliff/total)*100;
+        const linearPct=(linear/total)*100;
+        let vestBadge='';
+        if(info.vestingType==='cliff+linear') vestBadge=`<span style="font-size:.62rem;background:rgba(99,102,241,.12);color:var(--accent);border:1px solid rgba(99,102,241,.25);border-radius:4px;padding:1px 6px;margin-left:6px">Cliff + Linear</span>`;
+        else if(info.vestingType==='cliff') vestBadge=`<span style="font-size:.62rem;background:rgba(245,158,11,.12);color:#fcd34d;border:1px solid rgba(245,158,11,.25);border-radius:4px;padding:1px 6px;margin-left:6px">Cliff Lock</span>`;
+        else if(info.vestingType==='indefinite') vestBadge=`<span style="font-size:.62rem;background:rgba(6,182,212,.12);color:var(--blue);border:1px solid rgba(6,182,212,.25);border-radius:4px;padding:1px 6px;margin-left:6px">Indefinite</span>`;
+        const timelineHtml=(cliff>0||linear>0)?`
+          <div style="margin:10px 0 4px">
+            <div style="display:flex;gap:2px;height:8px;border-radius:4px;overflow:hidden">
+              ${cliff>0?`<div title="${cliff}mo cliff" style="width:${cliffPct}%;background:#f59e0b;border-radius:4px 0 0 4px"></div>`:''}
+              ${linear>0?`<div title="${linear}mo linear" style="width:${linearPct}%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:${cliff>0?'0 4px 4px 0':'4px'}"></div>`:''}
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--dim);margin-top:3px">
+              <span>Launch</span>
+              ${cliff>0?`<span style="color:#f59e0b">↑ Cliff ends (${cliff}mo)</span>`:''}
+              ${linear>0?`<span style="color:#8b5cf6">Fully vested (${total}mo)</span>`:''}
+            </div>
+          </div>`:'';
+        return `<div class="lc-meta">
+          <div style="margin-bottom:5px"><strong>Lock structure:</strong> ${info.duration}${vestBadge}</div>
+          ${timelineHtml}
+          <strong>Start:</strong> ${info.start}<br>
+          <div style="margin-top:5px;color:var(--muted);font-size:.72rem;line-height:1.6">${info.detail}</div>
+          ${info.platform==='Streamflow'?'<div style="margin-top:5px"><em style="color:var(--accent);font-size:.66rem">Tokens held in Streamflow contract — verify on-chain via Contract link.</em></div>':''}
+        </div>`;
+      })()}
       <div class="lc-links">${linksHtml}</div>`;
     grid.appendChild(card);
   });
