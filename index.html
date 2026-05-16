@@ -321,7 +321,7 @@ const KNOWN = {
            link:'https://app.streamflow.finance/contract/solana/mainnet/3pS8ALiikBG3JchUZjFH1GuZeNe5eNmT4HG8PPCkMWLP',
            contractAddr:'3pS8ALiikBG3JchUZjFH1GuZeNe5eNmT4HG8PPCkMWLP' }
   },
-  '9ek7tngasfgykgujvrscloxsbuqt8suhqnvc2mjgaviq': {
+  'HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC': {
     label:'Meteora Liq Pool', locked:true, pending:false,
     expectedAmt:56695437, expectedPct:5.6,
     lock:{ platform:'Meteora', platClass:'p-mt',
@@ -367,6 +367,7 @@ let totalSupply = null;
 let liveHolders  = [];   // [{tokenAccount, owner, amount, rank}]
 let ownerBalMap  = {};   // owner address → live balance
 let knownBalLive = {};   // known wallet addr → true if balance came from RPC (vs expectedAmt fallback)
+let knownOwnerAliases = {}; // blockchain owner addr → KNOWN wallet addr (for Streamflow escrows)
 let activeRpc  = RPCS[0];
 let cntTimer   = null;
 let cntVal     = REFRESH_SEC;
@@ -544,6 +545,23 @@ async function fetchChainData(){
   //    (locked tokens live in program/contract accounts, not the owner's wallet,
   //     so they won't appear in the top-holders owner map above)
   await fetchKnownWalletBalances(decimals);
+
+  // 4. Build alias map: some known wallets (e.g. Streamflow escrows) appear in the live holders
+  //    list under a different owner address (the escrow program). Match them by balance proximity.
+  knownOwnerAliases = {};
+  const usedAliases = new Set(Object.keys(KNOWN));
+  Object.entries(KNOWN).forEach(([knownAddr, info]) => {
+    if (liveHolders.some(h => h.owner === knownAddr)) return; // already matched directly
+    const bal = ownerBalMap[knownAddr];
+    if (!bal) return;
+    // Find a live holder with balance within 2% of known balance, not already claimed
+    const match = liveHolders.find(h =>
+      !usedAliases.has(h.owner) &&
+      !Object.values(knownOwnerAliases).includes(knownAddr) &&
+      Math.abs(h.amount - bal) / bal < 0.02
+    );
+    if (match) { knownOwnerAliases[match.owner] = knownAddr; usedAliases.add(match.owner); }
+  });
 }
 
 // Per-known-wallet direct balance fetch — tries wallet address, then contract address
@@ -763,7 +781,9 @@ function renderHoldersTable(){
   document.getElementById('holdersCnt').textContent=rows.length+' wallets tracked';
 
   rows.forEach((row,i)=>{
-    const known=KNOWN[row.owner];
+    // Match by direct owner, or via escrow alias (for Streamflow-locked wallets)
+    const resolvedAddr = KNOWN[row.owner] ? row.owner : (knownOwnerAliases[row.owner] || null);
+    const known = resolvedAddr ? KNOWN[resolvedAddr] : null;
     const pct=((row.amount/supply)*100);
     const pctStr=pct>=0.01?pct.toFixed(pct>=1?2:3)+'%':'<0.01%';
 
@@ -772,11 +792,13 @@ function renderHoldersTable(){
     // - if it's a known wallet with RPC-fetched balance: green with small "live" indicator
     // - if it's known wallet using expected fallback: yellow with "est." note
     let balHtml='';
+    // For aliased rows (Streamflow escrows), use the live balance from row directly
+    const lookupAddr = resolvedAddr || row.owner;
     if(row.isLiveHolder){
       balHtml=`<span class="live-cell ok">${fmtN(row.amount)}</span>`;
-    } else if(known && ownerBalMap[row.owner]!=null){
-      const isRpcLive=knownBalLive[row.owner];
-      balHtml=`<span class="live-cell ${isRpcLive?'ok':'warn'}">${fmtN(ownerBalMap[row.owner])}${isRpcLive?'':' <span style="font-size:.62rem;opacity:.7">(est.)</span>'}</span>`;
+    } else if(known && ownerBalMap[lookupAddr]!=null){
+      const isRpcLive=knownBalLive[lookupAddr];
+      balHtml=`<span class="live-cell ${isRpcLive?'ok':'warn'}">${fmtN(ownerBalMap[lookupAddr])}${isRpcLive?'':' <span style="font-size:.62rem;opacity:.7">(est.)</span>'}</span>`;
     } else {
       balHtml=`<span class="live-cell loading">—</span>`;
     }
